@@ -220,6 +220,78 @@
     }
 
     /* ─────────────────────────────────────────────────────────────────────
+       GALERÍA — "ver más" + visor de fotos (teclado, deslizar, foco)
+       ───────────────────────────────────────────────────────────────────── */
+    function initGallery() {
+        var grid = $('[data-gal-grid]'); if (!grid) return;
+        var btns = $$('[data-gal-open]', grid), imgs = btns.map(function (b) { return $('img', b); });
+        var LIMIT = 12, collapsed = false;
+        var more = $('[data-gal-more]'), expandBtn = $('[data-gal-expand]');
+        var expand = function (focusNext) {
+            if (!collapsed) return;
+            collapsed = false; grid.classList.remove('is-collapsed'); more.hidden = true;
+            if (focusNext && btns[LIMIT]) btns[LIMIT].focus({ preventScroll: true });
+        };
+        if (btns.length > LIMIT) {
+            collapsed = true; grid.classList.add('is-collapsed'); more.hidden = false;
+            expandBtn.addEventListener('click', function () { expand(true); });
+        }
+
+        var lb = $('#lb'), lbImg = $('#lb-img'), lbCap = $('#lb-cap'), lbCount = $('#lb-count');
+        var cur = -1, from = -1, closeT = 0, sx = 0, sy = 0;
+        var show = function (i) {
+            cur = (i + btns.length) % btns.length;
+            if (cur >= LIMIT) expand(false);
+            var im = imgs[cur];
+            lbImg.classList.add('is-swap');
+            lbImg.onload = lbImg.onerror = function () { lbImg.classList.remove('is-swap'); };
+            lbImg.src = im.getAttribute('src'); lbImg.alt = im.alt;
+            if (lbImg.complete) lbImg.classList.remove('is-swap');
+            lbCap.textContent = im.alt; lbCount.textContent = (cur + 1) + ' / ' + btns.length;
+            [cur + 1, cur - 1].forEach(function (k) { new Image().src = imgs[(k + btns.length) % btns.length].getAttribute('src'); });
+        };
+        var open = function (i) {
+            clearTimeout(closeT); from = i;
+            lb.hidden = false; void lb.offsetWidth; lb.classList.add('is-open');
+            root.classList.add('lb-open'); Scroll.stop();
+            show(i);
+            $('.lb__close', lb).focus();
+        };
+        var close = function () {
+            if (cur < 0) return;
+            var last = cur; cur = -1;
+            lb.classList.remove('is-open'); root.classList.remove('lb-open'); Scroll.start();
+            closeT = setTimeout(function () { lb.hidden = true; lbImg.removeAttribute('src'); }, 400);
+            btns[last].focus({ preventScroll: last === from });
+        };
+
+        grid.addEventListener('click', function (e) {
+            var b = e.target.closest && e.target.closest('[data-gal-open]');
+            if (b) open(Number(b.getAttribute('data-gal-open')));
+        });
+        $$('[data-lb-close]', lb).forEach(function (el) { el.addEventListener('click', close); });
+        $('[data-lb-prev]', lb).addEventListener('click', function () { show(cur - 1); });
+        $('[data-lb-next]', lb).addEventListener('click', function () { show(cur + 1); });
+        window.addEventListener('keydown', function (e) {
+            if (cur < 0) return;
+            if (e.key === 'Escape') close();
+            else if (e.key === 'ArrowRight') show(cur + 1);
+            else if (e.key === 'ArrowLeft') show(cur - 1);
+            else if (e.key === 'Tab') {
+                var f = $$('button', lb), a = document.activeElement;
+                if (e.shiftKey && a === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+                else if (!e.shiftKey && a === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+            }
+        });
+        lb.addEventListener('touchstart', function (e) { var t = e.changedTouches[0]; sx = t.clientX; sy = t.clientY; }, { passive: true });
+        lb.addEventListener('touchend', function (e) {
+            if (cur < 0) return;
+            var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+            if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) show(cur + (dx < 0 ? 1 : -1));
+        }, { passive: true });
+    }
+
+    /* ─────────────────────────────────────────────────────────────────────
        REVEAL + SPLIT DE TEXTO
        ───────────────────────────────────────────────────────────────────── */
     function splitWords(el, cls) {
@@ -965,6 +1037,7 @@
         safe('spotlight', initSpotlight);
         safe('marquee', initMarquee);
         safe('faq', initFaq);
+        safe('gallery', initGallery);
         safe('form', initForm);
         safe('three', initThree);
         Scroll.measure();
